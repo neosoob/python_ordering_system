@@ -3,28 +3,26 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}点餐系统{% endblock %}</title>
+    <title>{% block title %}&#28857;&#39184;&#31995;&#32479;{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand-logo.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <header class="site-header">
         <div class="container header-inner">
             <a class="brand" href="{{ url_for('index') }}">
-                <span class="brand-badge">OS</span>
+                <img class="brand-logo" src="{{ url_for('static', filename='brand-logo.svg') }}" alt="{{ store_name }}">
                 <span>
                     <strong>{{ store_name }}</strong>
-                    <small>匿名用户端 + 管理后台</small>
                 </span>
             </a>
             <nav class="top-nav">
-                <a href="{{ url_for('index') }}">菜单</a>
-                <a href="{{ url_for('cart') }}">购物车{% if cart_count %} ({{ cart_count }}){% endif %}</a>
-                <a href="{{ url_for('orders') }}">我的订单</a>
+                <a href="{{ url_for('index') }}">&#33756;&#21333;</a>
+                <a href="{{ url_for('cart') }}">&#36141;&#29289;&#36710;{% if cart_count %} ({{ cart_count }}){% endif %}</a>
+                <a href="{{ url_for('orders') }}">&#25105;&#30340;&#35746;&#21333;</a>
                 {% if g.admin %}
-                    <a href="{{ url_for('admin_dashboard') }}">管理后台</a>
-                    <a href="{{ url_for('admin_logout') }}">退出后台</a>
-                {% else %}
-                    <a href="{{ url_for('admin_login') }}">管理员登录</a>
+                    <a href="{{ url_for('admin_dashboard') }}">&#31649;&#29702;&#21518;&#21488;</a>
+                    <a href="{{ url_for('admin_logout') }}">&#36864;&#20986;&#21518;&#21488;</a>
                 {% endif %}
             </nav>
         </div>

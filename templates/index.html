@@ -1,19 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}用户点餐 - 食刻点餐{% endblock %}
+{% block title %}&#29992;&#25143;&#28857;&#39184; - {{ store_name }}{% endblock %}
 
 {% block content %}
 <section class="hero-panel">
     <div>
-        <p class="eyebrow">默认进入用户端</p>
-        <h1>打开就是菜单页，不登录也能直接点餐。</h1>
-        <p class="hero-copy">
-            系统会基于当前浏览器记录你的订单历史，因此“我的订单”默认展示的是当前设备下过的订单。
-        </p>
+        <h1>{{ store_name }}</h1>
     </div>
     <div class="hero-actions">
-        <a class="button button-primary" href="{{ url_for('orders') }}">我的订单 ({{ order_count }})</a>
-        <a class="button button-secondary" href="{{ url_for('cart') }}">查看购物车</a>
+        <a class="button button-primary" href="{{ url_for('orders') }}">&#25105;&#30340;&#35746;&#21333; ({{ order_count }})</a>
+        <a class="button button-secondary" href="{{ url_for('cart') }}">&#26597;&#30475;&#36141;&#29289;&#36710;</a>
     </div>
 </section>
 
@@ -33,10 +29,9 @@
             <section class="menu-section card-panel" id="category-{{ group.category['id'] }}">
                 <div class="section-header">
                     <div>
-                        <p class="section-tag">菜品分类</p>
                         <h2>{{ group.category['name'] }}</h2>
                     </div>
-                    <span class="count-pill">{{ group.dishes|length }} 道菜</span>
+                    <span class="count-pill">{{ group.dishes|length }} &#36947;&#33756;</span>
                 </div>
                 <div class="dish-grid">
                     {% for dish in group.dishes %}
@@ -49,16 +44,16 @@
                             <div class="dish-body">
                                 <div class="dish-head">
                                     <h3>{{ dish['name'] }}</h3>
-                                    <strong>¥{{ dish['price']|currency }}</strong>
+                                    <strong>&yen;{{ dish['price']|currency }}</strong>
                                 </div>
                                 <p>{{ dish['description'] }}</p>
                                 <form class="inline-form" action="{{ url_for('add_to_cart', dish_id=dish['id']) }}" method="post">
                                     <input type="hidden" name="next" value="{{ request.path }}">
                                     <label>
-                                        数量
+                                        &#25968;&#37327;
                                         <input type="number" name="quantity" min="1" max="99" value="1">
                                     </label>
-                                    <button class="button button-primary" type="submit">加入购物车</button>
+                                    <button class="button button-primary" type="submit">&#21152;&#20837;&#36141;&#29289;&#36710;</button>
                                 </form>
                             </div>
                         </article>
@@ -72,10 +67,9 @@
         <section class="card-panel cart-panel">
             <div class="section-header">
                 <div>
-                    <p class="section-tag">当前购物车</p>
-                    <h2>准备下单</h2>
+                    <h2>&#36141;&#29289;&#36710;</h2>
                 </div>
-                <a class="text-link" href="{{ url_for('cart') }}">展开详情</a>
+                <a class="text-link" href="{{ url_for('cart') }}">&#23637;&#24320;&#35814;&#24773;</a>
             </div>
 
             {% if cart_items %}
@@ -84,26 +78,26 @@
                         <div class="cart-item">
                             <div>
                                 <strong>{{ item.dish['name'] }}</strong>
-                                <p>{{ item.quantity }} 份</p>
+                                <p>{{ item.quantity }} &#20221;</p>
                             </div>
-                            <span>¥{{ item.subtotal|currency }}</span>
+                            <span>&yen;{{ item.subtotal|currency }}</span>
                         </div>
                     {% endfor %}
                 </div>
                 <div class="cart-total">
-                    <span>合计</span>
-                    <strong>¥{{ cart_total|currency }}</strong>
+                    <span>&#21512;&#35745;</span>
+                    <strong>&yen;{{ cart_total|currency }}</strong>
                 </div>
                 <form class="stack-form" action="{{ url_for('checkout') }}" method="post">
                     <label>
-                        取餐人（可选）
-                        <input type="text" name="customer_name" placeholder="例如：张三">
+                        &#21462;&#39184;&#20154;
+                        <input type="text" name="customer_name" placeholder="&#20363;&#22914;&#65306;&#24352;&#19977;">
                     </label>
-                    <button class="button button-primary button-block" type="submit">提交订单</button>
+                    <button class="button button-primary button-block" type="submit">&#25552;&#20132;&#35746;&#21333;</button>
                 </form>
             {% else %}
                 <div class="empty-state">
-                    <p>还没有添加菜品。先从左侧菜单挑几样吧。</p>
+                    <p>&#26242;&#26080;&#33756;&#21697;</p>
                 </div>
             {% endif %}
         </section>

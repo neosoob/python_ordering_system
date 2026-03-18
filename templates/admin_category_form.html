@@ -1,24 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}{{ form_title }} - 食刻点餐{% endblock %}
+{% block title %}{{ form_title }} - {{ store_name }}{% endblock %}
 
 {% block content %}
 <section class="form-shell">
     <article class="card-panel editor-card">
-        <p class="eyebrow">分类维护</p>
         <h1>{{ form_title }}</h1>
         <form class="stack-form" method="post">
             <label>
-                分类名称
+                &#20998;&#31867;&#21517;&#31216;
                 <input type="text" name="name" value="{{ category['name'] if category else '' }}" required>
             </label>
             <label>
-                排序值
+                &#25490;&#24207;&#20540;
                 <input type="number" name="sort_order" value="{{ category['sort_order'] if category else 0 }}" step="1">
             </label>
             <div class="form-actions">
                 <button class="button button-primary" type="submit">{{ submit_label }}</button>
-                <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">返回后台</a>
+                <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">&#36820;&#22238;&#21518;&#21488;</a>
             </div>
         </form>
     </article>

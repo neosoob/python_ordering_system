@@ -1,65 +1,56 @@
 {% extends "base.html" %}
 
-{% block title %}{{ form_title }} - 食刻点餐{% endblock %}
+{% block title %}{{ form_title }} - {{ store_name }}{% endblock %}
 
 {% block content %}
 <section class="form-shell">
     <article class="card-panel editor-card wide-card">
-        <p class="eyebrow">菜品维护</p>
         <h1>{{ form_title }}</h1>
         <form class="stack-form" method="post" enctype="multipart/form-data">
             <div class="form-grid">
                 <label>
-                    菜品名称
+                    &#33756;&#21697;&#21517;&#31216;
                     <input type="text" name="name" value="{{ dish['name'] if dish else '' }}" required>
                 </label>
                 <label>
-                    菜品分类
+                    &#33756;&#21697;&#20998;&#31867;
                     <select name="category_id" required>
                         {% for category in categories %}
-                            <option
-                                value="{{ category['id'] }}"
-                                {% if dish and dish['category_id'] == category['id'] %}selected{% endif %}
-                            >
+                            <option value="{{ category['id'] }}" {% if dish and dish['category_id'] == category['id'] %}selected{% endif %}>
                                 {{ category['name'] }}
                             </option>
                         {% endfor %}
                     </select>
                 </label>
                 <label>
-                    价格
+                    &#20215;&#26684;
                     <input type="number" name="price" min="0.01" step="0.01" value="{{ dish['price'] if dish else '' }}" required>
                 </label>
                 <label>
-                    菜品图片
+                    &#33756;&#21697;&#22270;&#29255;
                     <input type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp,.svg">
                 </label>
             </div>
 
             <label>
-                菜品介绍
+                &#33756;&#21697;&#20171;&#32461;
                 <textarea name="description" rows="5" required>{{ dish['description'] if dish else '' }}</textarea>
             </label>
 
             <label class="checkbox-line">
                 <input type="checkbox" name="is_active" {% if not dish or dish['is_active'] %}checked{% endif %}>
-                上架展示给用户端
+                &#19978;&#26550;&#23637;&#31034;&#32473;&#29992;&#25143;&#31471;
             </label>
 
             {% if dish %}
                 <div class="preview-box">
-                    <p>当前图片</p>
-                    <img
-                        class="preview-image"
-                        src="{{ url_for('static', filename=dish['image_path'] or 'demo/default-dish.svg') }}"
-                        alt="{{ dish['name'] }}"
-                    >
+                    <img class="preview-image" src="{{ url_for('static', filename=dish['image_path'] or 'demo/default-dish.svg') }}" alt="{{ dish['name'] }}">
                 </div>
             {% endif %}
 
             <div class="form-actions">
                 <button class="button button-primary" type="submit">{{ submit_label }}</button>
-                <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">返回后台</a>
+                <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">&#36820;&#22238;&#21518;&#21488;</a>
             </div>
         </form>
     </article>

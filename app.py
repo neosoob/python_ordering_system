@@ -1,25 +1,43 @@
-import os
+﻿import os
 import sqlite3
 import uuid
 from functools import wraps
 
-from flask import (
-    Flask,
-    current_app,
-    flash,
-    g,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
+from flask import Flask, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
 DEFAULT_IMAGE_PATH = "demo/default-dish.svg"
+DEFAULT_STORE_NAME = "点餐系统"
+DEFAULT_ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD = "admin123"
+ORDER_STATUS_SUBMITTED = "已提交"
+BAD_STORE_NAMES = {"", "Ordering System", "????", "点餐系统?", "鐐归绯荤粺"}
+DEMO_CATEGORY_MAP = {
+    "Featured": "热销推荐",
+    "Rice": "米饭主食",
+    "Drinks": "饮品甜点",
+}
+DEMO_DISH_MAP = {
+    "Signature Salmon Bowl": {
+        "name": "招牌三文鱼饭",
+        "description": "厚切三文鱼配寿司米、温泉蛋与特制酱汁。",
+    },
+    "Teriyaki Chicken Rice": {
+        "name": "照烧鸡排饭",
+        "description": "鸡排现煎现烤，搭配照烧汁与时令配菜。",
+    },
+    "Yuzu Sparkling Water": {
+        "name": "柚子气泡水",
+        "description": "清爽微气泡口感，适合搭配海鲜与炸物。",
+    },
+    "Matcha Milk": {
+        "name": "抹茶牛乳",
+        "description": "抹茶与鲜奶调和，口感顺滑细腻。",
+    },
+}
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS admins (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,7 +131,7 @@ def create_app(test_config=None):
         cart = session.get("cart", {})
         return {
             "cart_count": sum(int(quantity) for quantity in cart.values()),
-            "store_name": get_setting("store_name", "食刻点餐"),
+            "store_name": get_setting("store_name", DEFAULT_STORE_NAME),
         }
 
     @app.template_filter("currency")
@@ -164,11 +182,7 @@ def create_app(test_config=None):
     @app.route("/cart")
     def cart():
         cart_items, cart_total = get_cart_items()
-        return render_template(
-            "cart.html",
-            cart_items=cart_items,
-            cart_total=cart_total,
-        )
+        return render_template("cart.html", cart_items=cart_items, cart_total=cart_total)
 
     @app.route("/orders")
     def orders():
@@ -248,42 +262,45 @@ def create_app(test_config=None):
             flash("购物车为空，请先添加菜品。", "warning")
             return redirect(url_for("index"))
 
-        customer_name = request.form.get("customer_name", "").strip()
+        customer_name = clean_text(request.form.get("customer_name", "").strip())
         db = get_db()
         cursor = db.execute(
             """
             INSERT INTO orders (visitor_token, customer_name, total_amount, status)
             VALUES (?, ?, ?, ?)
             """,
-            (g.visitor_token, customer_name, cart_total, "已提交"),
+            (g.visitor_token, customer_name, cart_total, ORDER_STATUS_SUBMITTED),
         )
         order_id = cursor.lastrowid
         for item in cart_items:
-            dish = item["dish"]
             db.execute(
                 """
-                INSERT INTO order_items (
-                    order_id, dish_id, dish_name, price, quantity, subtotal
-                )
+                INSERT INTO order_items (order_id, dish_id, dish_name, price, quantity, subtotal)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     order_id,
-                    dish["id"],
-                    dish["name"],
-                    float(dish["price"]),
+                    item["dish"]["id"],
+                    clean_text(item["dish"]["name"]),
+                    item["dish"]["price"],
                     item["quantity"],
                     item["subtotal"],
                 ),
             )
         db.commit()
         session["cart"] = {}
-        flash("订单提交成功，可在“我的订单”里查看当前设备下过的订单。", "success")
+        flash("订单提交成功。", "success")
         return redirect(url_for("orders"))
+
+    @app.route("/admin")
+    def admin_root():
+        if g.admin:
+            return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_login"))
 
     @app.route("/admin/login", methods=("GET", "POST"))
     def admin_login():
-        if g.admin is not None:
+        if g.admin:
             return redirect(url_for("admin_dashboard"))
 
         if request.method == "POST":
@@ -293,28 +310,25 @@ def create_app(test_config=None):
                 "SELECT * FROM admins WHERE username = ?",
                 (username,),
             ).fetchone()
-            if admin is None or not check_password_hash(admin["password_hash"], password):
-                flash("管理员账号或密码错误。", "warning")
-            else:
+            if admin and check_password_hash(admin["password_hash"], password):
                 session["admin_id"] = admin["id"]
                 flash("管理员登录成功。", "success")
                 return redirect(url_for("admin_dashboard"))
+            flash("管理员账号或密码错误。", "warning")
 
         return render_template("admin_login.html")
 
     @app.route("/admin/logout")
+    @admin_required
     def admin_logout():
         session.pop("admin_id", None)
         flash("已退出管理员后台。", "success")
         return redirect(url_for("index"))
 
-    @app.route("/admin")
+    @app.route("/admin/dashboard")
     @admin_required
     def admin_dashboard():
         db = get_db()
-        category_count = db.execute("SELECT COUNT(*) AS count FROM categories").fetchone()["count"]
-        dish_count = db.execute("SELECT COUNT(*) AS count FROM dishes").fetchone()["count"]
-        order_count = db.execute("SELECT COUNT(*) AS count FROM orders").fetchone()["count"]
         categories = db.execute(
             """
             SELECT c.*, COUNT(d.id) AS dish_count
@@ -332,62 +346,103 @@ def create_app(test_config=None):
             ORDER BY c.sort_order, d.id DESC
             """
         ).fetchall()
-        recent_orders = db.execute(
-            """
-            SELECT id, customer_name, total_amount, status, created_at
-            FROM orders
-            ORDER BY created_at DESC, id DESC
-            LIMIT 8
-            """
-        ).fetchall()
+        category_count = db.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
+        dish_count = db.execute("SELECT COUNT(*) FROM dishes").fetchone()[0]
+        order_count = db.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
+        admin_orders = load_admin_orders(db)
         return render_template(
             "admin_dashboard.html",
             categories=categories,
             dishes=dishes,
-            recent_orders=recent_orders,
             category_count=category_count,
             dish_count=dish_count,
             order_count=order_count,
+            admin_orders=admin_orders,
         )
 
     @app.route("/admin/store", methods=("POST",))
     @admin_required
     def admin_store_update():
-        store_name = request.form.get("store_name", "").strip()
+        store_name = clean_text(request.form.get("store_name", "").strip())
         if not store_name:
             flash("店名不能为空。", "warning")
-        else:
-            set_setting("store_name", store_name)
-            flash("店名更新成功。", "success")
+            return redirect(url_for("admin_dashboard"))
+        set_setting("store_name", store_name)
+        flash("店名更新成功。", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.route("/admin/orders/<int:order_id>/delete", methods=("POST",))
+    @admin_required
+    def admin_order_delete(order_id):
+        db = get_db()
+        order = db.execute("SELECT id FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if order is None:
+            flash("订单不存在。", "warning")
+            return redirect(url_for("admin_dashboard"))
+
+        db.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+        db.commit()
+        flash("订单删除成功。", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.route("/admin/orders/<int:order_id>/items/<int:item_id>/delete", methods=("POST",))
+    @admin_required
+    def admin_order_item_delete(order_id, item_id):
+        db = get_db()
+        order = db.execute("SELECT id FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if order is None:
+            flash("订单不存在。", "warning")
+            return redirect(url_for("admin_dashboard"))
+
+        item = db.execute(
+            "SELECT id FROM order_items WHERE id = ? AND order_id = ?",
+            (item_id, order_id),
+        ).fetchone()
+        if item is None:
+            flash("订单菜品不存在。", "warning")
+            return redirect(url_for("admin_dashboard"))
+
+        db.execute("DELETE FROM order_items WHERE id = ?", (item_id,))
+        remaining_count = db.execute(
+            "SELECT COUNT(*) FROM order_items WHERE order_id = ?",
+            (order_id,),
+        ).fetchone()[0]
+        if remaining_count == 0:
+            db.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+            db.commit()
+            flash("订单中已无菜品，整单已删除。", "success")
+            return redirect(url_for("admin_dashboard"))
+
+        refresh_order_total(db, order_id)
+        db.commit()
+        flash("订单菜品删除成功。", "success")
         return redirect(url_for("admin_dashboard"))
 
     @app.route("/admin/categories/create", methods=("GET", "POST"))
     @admin_required
     def admin_category_create():
         if request.method == "POST":
-            name = request.form.get("name", "").strip()
-            sort_order = parse_sort_order(request.form.get("sort_order", "0"))
-
+            name = clean_text(request.form.get("name", "").strip())
+            sort_order = parse_integer(request.form.get("sort_order", "0"), default=0)
             if not name:
                 flash("分类名称不能为空。", "warning")
+            elif category_name_exists(name):
+                flash("分类名称已存在。", "warning")
             else:
-                try:
-                    db = get_db()
-                    db.execute(
-                        "INSERT INTO categories (name, sort_order) VALUES (?, ?)",
-                        (name, sort_order),
-                    )
-                    db.commit()
-                    flash("分类创建成功。", "success")
-                    return redirect(url_for("admin_dashboard"))
-                except sqlite3.IntegrityError:
-                    flash("分类名称已存在。", "warning")
+                db = get_db()
+                db.execute(
+                    "INSERT INTO categories (name, sort_order) VALUES (?, ?)",
+                    (name, sort_order),
+                )
+                db.commit()
+                flash("分类创建成功。", "success")
+                return redirect(url_for("admin_dashboard"))
 
         return render_template(
             "admin_category_form.html",
             category=None,
             form_title="新增分类",
-            submit_label="保存分类",
+            submit_label="创建分类",
         )
 
     @app.route("/admin/categories/<int:category_id>/edit", methods=("GET", "POST"))
@@ -403,142 +458,112 @@ def create_app(test_config=None):
             return redirect(url_for("admin_dashboard"))
 
         if request.method == "POST":
-            name = request.form.get("name", "").strip()
-            sort_order = parse_sort_order(request.form.get("sort_order", "0"))
-
+            name = clean_text(request.form.get("name", "").strip())
+            sort_order = parse_integer(request.form.get("sort_order", "0"), default=0)
             if not name:
                 flash("分类名称不能为空。", "warning")
+            elif category_name_exists(name, exclude_id=category_id):
+                flash("分类名称已存在。", "warning")
             else:
-                try:
-                    db.execute(
-                        """
-                        UPDATE categories
-                        SET name = ?, sort_order = ?
-                        WHERE id = ?
-                        """,
-                        (name, sort_order, category_id),
-                    )
-                    db.commit()
-                    flash("分类更新成功。", "success")
-                    return redirect(url_for("admin_dashboard"))
-                except sqlite3.IntegrityError:
-                    flash("分类名称已存在。", "warning")
+                db.execute(
+                    "UPDATE categories SET name = ?, sort_order = ? WHERE id = ?",
+                    (name, sort_order, category_id),
+                )
+                db.commit()
+                flash("分类更新成功。", "success")
+                return redirect(url_for("admin_dashboard"))
 
         return render_template(
             "admin_category_form.html",
             category=category,
             form_title="编辑分类",
-            submit_label="更新分类",
+            submit_label="保存分类",
         )
 
     @app.route("/admin/categories/<int:category_id>/delete", methods=("POST",))
     @admin_required
     def admin_category_delete(category_id):
         db = get_db()
-        dish_count = db.execute(
-            "SELECT COUNT(*) AS count FROM dishes WHERE category_id = ?",
+        category = db.execute(
+            "SELECT * FROM categories WHERE id = ?",
             (category_id,),
-        ).fetchone()["count"]
+        ).fetchone()
+        if category is None:
+            flash("分类不存在。", "warning")
+            return redirect(url_for("admin_dashboard"))
+
+        dish_count = db.execute(
+            "SELECT COUNT(*) FROM dishes WHERE category_id = ?",
+            (category_id,),
+        ).fetchone()[0]
         if dish_count:
-            flash("该分类下仍有菜品，请先处理菜品。", "warning")
-        else:
-            db.execute("DELETE FROM categories WHERE id = ?", (category_id,))
-            db.commit()
-            flash("分类已删除。", "success")
+            flash("该分类下仍有菜品，无法删除。", "warning")
+            return redirect(url_for("admin_dashboard"))
+
+        db.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        db.commit()
+        flash("分类删除成功。", "success")
         return redirect(url_for("admin_dashboard"))
 
     @app.route("/admin/dishes/create", methods=("GET", "POST"))
     @admin_required
     def admin_dish_create():
-        db = get_db()
-        categories = db.execute(
-            "SELECT * FROM categories ORDER BY sort_order, id"
-        ).fetchall()
+        categories = load_categories()
         if not categories:
-            flash("请先创建分类，再新增菜品。", "warning")
-            return redirect(url_for("admin_category_create"))
+            flash("请先创建菜品分类。", "warning")
+            return redirect(url_for("admin_dashboard"))
 
         if request.method == "POST":
-            form_data, error = validate_dish_form(request, categories)
-            if error is None:
-                image_path = DEFAULT_IMAGE_PATH
-                image_file = request.files.get("image")
-                if image_file and image_file.filename:
-                    try:
-                        image_path = save_uploaded_image(image_file)
-                    except ValueError as exc:
-                        error = str(exc)
-
-                if error is None:
-                    db.execute(
-                        """
-                        INSERT INTO dishes (
-                            category_id, name, description, price, image_path, is_active
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            form_data["category_id"],
-                            form_data["name"],
-                            form_data["description"],
-                            form_data["price"],
-                            image_path,
-                            form_data["is_active"],
-                        ),
-                    )
-                    db.commit()
-                    flash("菜品创建成功。", "success")
-                    return redirect(url_for("admin_dashboard"))
-
-            flash(error, "warning")
+            form_data, error = validate_dish_form(categories)
+            if error:
+                flash(error, "warning")
+            else:
+                db = get_db()
+                db.execute(
+                    """
+                    INSERT INTO dishes (category_id, name, description, price, image_path, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        form_data["category_id"],
+                        form_data["name"],
+                        form_data["description"],
+                        form_data["price"],
+                        form_data["image_path"],
+                        form_data["is_active"],
+                    ),
+                )
+                db.commit()
+                flash("菜品创建成功。", "success")
+                return redirect(url_for("admin_dashboard"))
 
         return render_template(
             "admin_dish_form.html",
             dish=None,
             categories=categories,
             form_title="新增菜品",
-            submit_label="保存菜品",
+            submit_label="创建菜品",
         )
 
     @app.route("/admin/dishes/<int:dish_id>/edit", methods=("GET", "POST"))
     @admin_required
     def admin_dish_edit(dish_id):
         db = get_db()
-        categories = db.execute(
-            "SELECT * FROM categories ORDER BY sort_order, id"
-        ).fetchall()
-        dish = db.execute(
-            "SELECT * FROM dishes WHERE id = ?",
-            (dish_id,),
-        ).fetchone()
+        dish = db.execute("SELECT * FROM dishes WHERE id = ?", (dish_id,)).fetchone()
         if dish is None:
             flash("菜品不存在。", "warning")
             return redirect(url_for("admin_dashboard"))
 
+        categories = load_categories()
         if request.method == "POST":
-            form_data, error = validate_dish_form(request, categories)
-            image_path = dish["image_path"] or DEFAULT_IMAGE_PATH
-
-            image_file = request.files.get("image")
-            if error is None and image_file and image_file.filename:
-                try:
-                    new_image_path = save_uploaded_image(image_file)
-                    delete_uploaded_image(dish["image_path"])
-                    image_path = new_image_path
-                except ValueError as exc:
-                    error = str(exc)
-
-            if error is None:
+            form_data, error = validate_dish_form(categories, existing_dish=dish)
+            if error:
+                flash(error, "warning")
+            else:
                 db.execute(
                     """
                     UPDATE dishes
-                    SET category_id = ?,
-                        name = ?,
-                        description = ?,
-                        price = ?,
-                        image_path = ?,
-                        is_active = ?,
-                        updated_at = CURRENT_TIMESTAMP
+                    SET category_id = ?, name = ?, description = ?, price = ?, image_path = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                     """,
                     (
@@ -546,7 +571,7 @@ def create_app(test_config=None):
                         form_data["name"],
                         form_data["description"],
                         form_data["price"],
-                        image_path,
+                        form_data["image_path"],
                         form_data["is_active"],
                         dish_id,
                     ),
@@ -555,14 +580,12 @@ def create_app(test_config=None):
                 flash("菜品更新成功。", "success")
                 return redirect(url_for("admin_dashboard"))
 
-            flash(error, "warning")
-
         return render_template(
             "admin_dish_form.html",
             dish=dish,
             categories=categories,
             form_title="编辑菜品",
-            submit_label="更新菜品",
+            submit_label="保存菜品",
         )
 
     @app.route("/admin/dishes/<int:dish_id>/delete", methods=("POST",))
@@ -572,58 +595,146 @@ def create_app(test_config=None):
         dish = db.execute("SELECT * FROM dishes WHERE id = ?", (dish_id,)).fetchone()
         if dish is None:
             flash("菜品不存在。", "warning")
-        else:
-            delete_uploaded_image(dish["image_path"])
-            db.execute("DELETE FROM dishes WHERE id = ?", (dish_id,))
-            db.commit()
-            flash("菜品已删除。", "success")
+            return redirect(url_for("admin_dashboard"))
+
+        db.execute("DELETE FROM dishes WHERE id = ?", (dish_id,))
+        db.commit()
+        flash("菜品删除成功。", "success")
         return redirect(url_for("admin_dashboard"))
 
     with app.app_context():
-        init_db()
-        seed_data()
+        init_database()
 
     return app
 
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(
-            current_app.config["DATABASE"],
-            detect_types=sqlite3.PARSE_DECLTYPES,
-        )
+        g.db = sqlite3.connect(current_app.config["DATABASE"])
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
 
 
-def ensure_visitor_token():
-    if "visitor_token" not in session:
-        session["visitor_token"] = uuid.uuid4().hex
-    g.visitor_token = session["visitor_token"]
-
-
-def init_db():
+def init_database():
     db = get_db()
     db.executescript(SCHEMA_SQL)
+    ensure_admin_account(db)
+    ensure_setting(db, "store_name", DEFAULT_STORE_NAME)
+    ensure_setting(db, "demo_data_seeded", "0")
+    migrate_existing_data(db)
+    seed_demo_data(db)
     db.commit()
 
 
-def seed_data():
-    db = get_db()
+def ensure_admin_account(db):
     admin = db.execute(
         "SELECT id FROM admins WHERE username = ?",
-        ("admin",),
+        (DEFAULT_ADMIN_USERNAME,),
     ).fetchone()
     if admin is None:
         db.execute(
             "INSERT INTO admins (username, password_hash) VALUES (?, ?)",
-            ("admin", generate_password_hash("admin123")),
+            (DEFAULT_ADMIN_USERNAME, generate_password_hash(DEFAULT_ADMIN_PASSWORD)),
         )
-    db.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
-        ("store_name", "食刻点餐"),
-    )
+
+
+def ensure_setting(db, key, value):
+    existing = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    if existing is None:
+        db.execute("INSERT INTO settings (key, value) VALUES (?, ?)", (key, value))
+
+
+def migrate_existing_data(db):
+    store_row = db.execute("SELECT value FROM settings WHERE key = 'store_name'").fetchone()
+    if store_row and store_row[0] in BAD_STORE_NAMES:
+        db.execute(
+            "UPDATE settings SET value = ? WHERE key = 'store_name'",
+            (DEFAULT_STORE_NAME,),
+        )
+    elif store_row:
+        repaired_store = clean_text(store_row[0])
+        if repaired_store != store_row[0]:
+            db.execute(
+                "UPDATE settings SET value = ? WHERE key = 'store_name'",
+                (repaired_store,),
+            )
+
+    for row in db.execute("SELECT id, status, customer_name FROM orders").fetchall():
+        status = ORDER_STATUS_SUBMITTED
+        customer_name = clean_text(row["customer_name"])
+        if status != row["status"] or customer_name != row["customer_name"]:
+            db.execute(
+                "UPDATE orders SET status = ?, customer_name = ? WHERE id = ?",
+                (status, customer_name, row["id"]),
+            )
+
+    for row in db.execute("SELECT id, name FROM categories").fetchall():
+        name = clean_text(row["name"])
+        name = DEMO_CATEGORY_MAP.get(name, name)
+        if is_placeholder_name(name):
+            dish_count = db.execute(
+                "SELECT COUNT(*) FROM dishes WHERE category_id = ?",
+                (row["id"],),
+            ).fetchone()[0]
+            if dish_count == 0:
+                db.execute("DELETE FROM categories WHERE id = ?", (row["id"],))
+                continue
+        if name != row["name"]:
+            db.execute("UPDATE categories SET name = ? WHERE id = ?", (name, row["id"]))
+
+    category_name_to_id = {
+        row["name"]: row["id"]
+        for row in db.execute("SELECT id, name FROM categories").fetchall()
+    }
+
+    for row in db.execute("SELECT id, category_id, name, description FROM dishes").fetchall():
+        name = clean_text(row["name"])
+        description = clean_text(row["description"])
+        category_id = row["category_id"]
+        if name in DEMO_DISH_MAP:
+            mapped = DEMO_DISH_MAP[name]
+            name = mapped["name"]
+            description = mapped["description"]
+        category_row = db.execute(
+            "SELECT name FROM categories WHERE id = ?",
+            (category_id,),
+        ).fetchone()
+        if category_row:
+            new_category_name = DEMO_CATEGORY_MAP.get(category_row["name"])
+            if new_category_name and new_category_name in category_name_to_id:
+                category_id = category_name_to_id[new_category_name]
+        if (
+            name != row["name"]
+            or description != row["description"]
+            or category_id != row["category_id"]
+        ):
+            db.execute(
+                "UPDATE dishes SET category_id = ?, name = ?, description = ? WHERE id = ?",
+                (category_id, name, description, row["id"]),
+            )
+
+    for row in db.execute("SELECT id, dish_name FROM order_items").fetchall():
+        repaired_name = clean_text(row["dish_name"])
+        if repaired_name != row["dish_name"]:
+            db.execute(
+                "UPDATE order_items SET dish_name = ? WHERE id = ?",
+                (repaired_name, row["id"]),
+            )
+
+
+def seed_demo_data(db):
+    seeded = db.execute(
+        "SELECT value FROM settings WHERE key = 'demo_data_seeded'"
+    ).fetchone()[0]
+    category_count = db.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
+    dish_count = db.execute("SELECT COUNT(*) FROM dishes").fetchone()[0]
+    if seeded == "1" or category_count > 0 or dish_count > 0:
+        if seeded != "1":
+            db.execute(
+                "UPDATE settings SET value = '1' WHERE key = 'demo_data_seeded'"
+            )
+        return
 
     categories = [
         ("热销推荐", 1),
@@ -632,67 +743,41 @@ def seed_data():
     ]
     for name, sort_order in categories:
         db.execute(
-            "INSERT OR IGNORE INTO categories (name, sort_order) VALUES (?, ?)",
+            "INSERT INTO categories (name, sort_order) VALUES (?, ?)",
             (name, sort_order),
         )
-    db.commit()
 
-    dish_count = db.execute("SELECT COUNT(*) AS count FROM dishes").fetchone()["count"]
-    if dish_count == 0:
-        category_map = {
-            row["name"]: row["id"]
-            for row in db.execute("SELECT id, name FROM categories").fetchall()
-        }
-        demo_dishes = [
-            (
-                category_map["热销推荐"],
-                "宫保鸡丁饭",
-                "鸡丁、花生和小米椒一起爆香，适合作为工作日午餐。",
-                24.0,
-                DEFAULT_IMAGE_PATH,
-                1,
-            ),
-            (
-                category_map["热销推荐"],
-                "黑椒牛肉意面",
-                "黑椒酱汁包裹牛肉片和意面，味道偏浓郁。",
-                29.0,
-                DEFAULT_IMAGE_PATH,
-                1,
-            ),
-            (
-                category_map["米饭主食"],
-                "扬州炒饭",
-                "火腿、鸡蛋、青豆与米饭同炒，口感清爽。",
-                18.0,
-                DEFAULT_IMAGE_PATH,
-                1,
-            ),
-            (
-                category_map["饮品甜点"],
-                "柠檬红茶",
-                "现泡红茶加入新鲜柠檬片，适合搭配重口味菜品。",
-                12.0,
-                DEFAULT_IMAGE_PATH,
-                1,
-            ),
-        ]
-        db.executemany(
+    category_map = {
+        row["name"]: row["id"]
+        for row in db.execute("SELECT id, name FROM categories").fetchall()
+    }
+    demo_dishes = [
+        ("热销推荐", "招牌三文鱼饭", "厚切三文鱼配寿司米、温泉蛋与特制酱汁。", 48.0),
+        ("米饭主食", "照烧鸡排饭", "鸡排现煎现烤，搭配照烧汁与时令配菜。", 36.0),
+        ("饮品甜点", "柚子气泡水", "清爽微气泡口感，适合搭配海鲜与炸物。", 12.0),
+        ("饮品甜点", "抹茶牛乳", "抹茶与鲜奶调和，口感顺滑细腻。", 18.0),
+    ]
+    for category_name, name, description, price in demo_dishes:
+        db.execute(
             """
-            INSERT INTO dishes (
-                category_id, name, description, price, image_path, is_active
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO dishes (category_id, name, description, price, image_path, is_active)
+            VALUES (?, ?, ?, ?, ?, 1)
             """,
-            demo_dishes,
+            (
+                category_map[category_name],
+                name,
+                description,
+                price,
+                DEFAULT_IMAGE_PATH,
+            ),
         )
-        db.commit()
+    db.execute("UPDATE settings SET value = '1' WHERE key = 'demo_data_seeded'")
 
 
 def admin_required(view):
     @wraps(view)
     def wrapped_view(**kwargs):
-        if g.admin is None:
+        if not g.admin:
             flash("请先登录管理员账号。", "warning")
             return redirect(url_for("admin_login"))
         return view(**kwargs)
@@ -700,29 +785,24 @@ def admin_required(view):
     return wrapped_view
 
 
-def get_safe_next(default_endpoint):
-    target = request.form.get("next") or request.args.get("next")
-    if target and target.startswith("/") and not target.startswith("//"):
-        return target
-    return url_for(default_endpoint)
+def ensure_visitor_token():
+    token = session.get("visitor_token")
+    if not token:
+        token = uuid.uuid4().hex
+        session["visitor_token"] = token
+    g.visitor_token = token
 
 
-def get_setting(key, default_value=""):
-    row = get_db().execute(
-        "SELECT value FROM settings WHERE key = ?",
-        (key,),
-    ).fetchone()
-    if row is None:
-        return default_value
-    return row["value"]
+def get_setting(key, default=None):
+    row = get_db().execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
 
 
 def set_setting(key, value):
     db = get_db()
     db.execute(
         """
-        INSERT INTO settings (key, value)
-        VALUES (?, ?)
+        INSERT INTO settings (key, value) VALUES (?, ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
         """,
         (key, value),
@@ -730,156 +810,240 @@ def set_setting(key, value):
     db.commit()
 
 
-def parse_quantity(value):
-    try:
-        quantity = int(value)
-    except (TypeError, ValueError):
-        quantity = 1
-    return max(quantity, 0)
+def load_admin_orders(db):
+    orders = db.execute(
+        """
+        SELECT o.*,
+               COUNT(oi.id) AS item_count
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        GROUP BY o.id
+        ORDER BY o.created_at DESC, o.id DESC
+        """
+    ).fetchall()
+    items = db.execute(
+        """
+        SELECT *
+        FROM order_items
+        ORDER BY order_id DESC, id ASC
+        """
+    ).fetchall()
+    item_map = {}
+    for item in items:
+        item_map.setdefault(item["order_id"], []).append(item)
+    return [{"order": order, "items": item_map.get(order["id"], [])} for order in orders]
 
 
-def parse_sort_order(value):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
+def refresh_order_total(db, order_id):
+    total = db.execute(
+        "SELECT COALESCE(SUM(subtotal), 0) FROM order_items WHERE order_id = ?",
+        (order_id,),
+    ).fetchone()[0]
+    db.execute(
+        "UPDATE orders SET total_amount = ? WHERE id = ?",
+        (round(float(total), 2), order_id),
+    )
 
 
 def build_grouped_menu(categories, dishes):
     dish_map = {}
     for dish in dishes:
         dish_map.setdefault(dish["category_id"], []).append(dish)
-
-    groups = []
-    for category in categories:
-        category_dishes = dish_map.get(category["id"], [])
-        if category_dishes:
-            groups.append({"category": category, "dishes": category_dishes})
-    return groups
+    return [
+        {"category": category, "dishes": dish_map.get(category["id"], [])}
+        for category in categories
+        if dish_map.get(category["id"])
+    ]
 
 
 def get_cart_items():
     cart = session.get("cart", {})
-    if not cart:
-        return [], 0.0
-
-    dish_ids = []
-    for raw_id in cart.keys():
-        try:
-            dish_ids.append(int(raw_id))
-        except ValueError:
-            continue
-
+    dish_ids = [int(dish_id) for dish_id in cart.keys() if str(dish_id).isdigit()]
     if not dish_ids:
         return [], 0.0
 
     placeholders = ",".join("?" for _ in dish_ids)
     dishes = get_db().execute(
-        f"""
-        SELECT d.*, c.name AS category_name
-        FROM dishes d
-        JOIN categories c ON c.id = d.category_id
-        WHERE d.id IN ({placeholders}) AND d.is_active = 1
-        """,
+        f"SELECT * FROM dishes WHERE id IN ({placeholders}) AND is_active = 1",
         tuple(dish_ids),
     ).fetchall()
-    dish_map = {str(dish["id"]): dish for dish in dishes}
-
+    dish_map = {dish["id"]: dish for dish in dishes}
     items = []
     total = 0.0
-    stale_ids = []
-    for dish_id, quantity in cart.items():
-        dish = dish_map.get(str(dish_id))
-        if dish is None:
-            stale_ids.append(str(dish_id))
+    cleaned_cart = {}
+    for dish_id_str, quantity in cart.items():
+        try:
+            dish_id = int(dish_id_str)
+            quantity_value = max(1, min(int(quantity), 99))
+        except (TypeError, ValueError):
             continue
-
-        quantity = max(int(quantity), 1)
-        subtotal = float(dish["price"]) * quantity
+        dish = dish_map.get(dish_id)
+        if dish is None:
+            continue
+        subtotal = float(dish["price"]) * quantity_value
+        items.append({"dish": dish, "quantity": quantity_value, "subtotal": subtotal})
         total += subtotal
-        items.append(
-            {
-                "dish": dish,
-                "quantity": quantity,
-                "subtotal": subtotal,
-            }
-        )
-
-    if stale_ids:
-        for stale_id in stale_ids:
-            cart.pop(stale_id, None)
-        session["cart"] = cart
-
+        cleaned_cart[dish_id_str] = quantity_value
+    if cleaned_cart != cart:
+        session["cart"] = cleaned_cart
     return items, total
 
 
-def validate_dish_form(req, categories):
-    name = req.form.get("name", "").strip()
-    description = req.form.get("description", "").strip()
-    category_id = req.form.get("category_id", "").strip()
-    price_raw = req.form.get("price", "").strip()
-    is_active = 1 if req.form.get("is_active") == "on" else 0
+def parse_quantity(raw_value):
+    try:
+        return max(0, min(int(raw_value), 99))
+    except (TypeError, ValueError):
+        return 1
+
+
+def parse_integer(raw_value, default=0):
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_price(raw_value):
+    try:
+        value = round(float(raw_value), 2)
+        if value <= 0:
+            raise ValueError
+        return value
+    except (TypeError, ValueError):
+        return None
+
+
+def get_safe_next(default_endpoint):
+    next_value = request.form.get("next") or request.args.get("next")
+    if next_value and next_value.startswith("/") and not next_value.startswith("//"):
+        return next_value
+    return url_for(default_endpoint)
+
+
+def load_categories():
+    return get_db().execute(
+        "SELECT * FROM categories ORDER BY sort_order, id"
+    ).fetchall()
+
+
+def category_name_exists(name, exclude_id=None):
+    query = "SELECT id FROM categories WHERE name = ?"
+    params = [name]
+    if exclude_id is not None:
+        query += " AND id != ?"
+        params.append(exclude_id)
+    return get_db().execute(query, tuple(params)).fetchone() is not None
+
+
+def validate_dish_form(categories, existing_dish=None):
+    category_ids = {category["id"] for category in categories}
+    name = clean_text(request.form.get("name", "").strip())
+    description = clean_text(request.form.get("description", "").strip())
+    category_id = parse_integer(request.form.get("category_id"), default=-1)
+    price = parse_price(request.form.get("price"))
+    is_active = 1 if request.form.get("is_active") else 0
 
     if not name:
         return None, "菜品名称不能为空。"
+    if category_id not in category_ids:
+        return None, "请选择有效的菜品分类。"
+    if price is None:
+        return None, "请输入有效价格。"
     if not description:
         return None, "菜品介绍不能为空。"
 
-    try:
-        category_id = int(category_id)
-    except (TypeError, ValueError):
-        return None, "请选择正确的菜品分类。"
-
-    category_ids = {category["id"] for category in categories}
-    if category_id not in category_ids:
-        return None, "请选择正确的菜品分类。"
-
-    try:
-        price = round(float(price_raw), 2)
-    except (TypeError, ValueError):
-        return None, "请输入正确的价格。"
-
-    if price <= 0:
-        return None, "价格必须大于 0。"
+    image_file = request.files.get("image")
+    image_path = existing_dish["image_path"] if existing_dish else DEFAULT_IMAGE_PATH
+    if image_file and image_file.filename:
+        image_path, error = save_uploaded_image(image_file)
+        if error:
+            return None, error
 
     return {
+        "category_id": category_id,
         "name": name,
         "description": description,
-        "category_id": category_id,
         "price": price,
+        "image_path": image_path or DEFAULT_IMAGE_PATH,
         "is_active": is_active,
     }, None
 
 
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def save_uploaded_image(file_storage):
-    if file_storage is None or not file_storage.filename:
-        raise ValueError("请选择图片后再上传。")
-    if not allowed_file(file_storage.filename):
-        raise ValueError("图片格式不支持，仅支持 png/jpg/jpeg/gif/webp/svg。")
-
-    filename = secure_filename(file_storage.filename)
+def save_uploaded_image(image_file):
+    filename = secure_filename(image_file.filename or "")
+    if not filename:
+        return None, "图片文件名无效，请重新选择图片。"
+    if "." not in filename:
+        return None, "图片文件格式不正确，请上传常见图片格式。"
     extension = filename.rsplit(".", 1)[1].lower()
-    unique_name = "{}.{}".format(uuid.uuid4().hex, extension)
+    if extension not in ALLOWED_EXTENSIONS:
+        return None, "仅支持 png、jpg、jpeg、gif、webp、svg 格式图片。"
+
+    unique_name = f"{uuid.uuid4().hex}.{extension}"
     relative_path = os.path.join("uploads", unique_name).replace("\\", "/")
-    save_path = os.path.join(current_app.static_folder, relative_path.replace("/", os.sep))
-    file_storage.save(save_path)
-    return relative_path
+    absolute_path = os.path.join(current_app.static_folder, relative_path)
+    image_file.save(absolute_path)
+    return relative_path, None
 
 
-def delete_uploaded_image(image_path):
-    if not image_path or not image_path.startswith("uploads/"):
-        return
-    file_path = os.path.join(current_app.static_folder, image_path.replace("/", os.sep))
-    if os.path.exists(file_path):
-        os.remove(file_path)
+def is_placeholder_name(value):
+    stripped = (value or "").strip()
+    if not stripped:
+        return True
+    return all(char in {"?", "？", "�"} for char in stripped)
+
+
+def clean_text(value):
+    if value is None:
+        return ""
+    text = str(value)
+    candidate = text.strip()
+    if not candidate:
+        return ""
+    repaired = repair_mojibake(candidate)
+    return repaired.strip()
+
+
+def repair_mojibake(text):
+    best = text
+    seen = {text}
+    while True:
+        candidate = try_repair_utf8_latin1(best)
+        if not candidate or candidate in seen:
+            break
+        if score_text(candidate) < score_text(best):
+            break
+        seen.add(candidate)
+        best = candidate
+    return best
+
+
+def try_repair_utf8_latin1(text):
+    try:
+        return text.encode("latin1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
+def score_text(text):
+    score = 0
+    for char in text:
+        code = ord(char)
+        if 0x4E00 <= code <= 0x9FFF:
+            score += 4
+        elif 0x3040 <= code <= 0x30FF:
+            score += 2
+        elif char.isalnum() or char in " -_./:&()[]{}+@#%*，。！？、￥":
+            score += 1
+        elif char in "ÃÂÐ¤¦¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿":
+            score -= 3
+        else:
+            score -= 1
+    return score
 
 
 app = create_app()
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=7878)
+    app.run(host="127.0.0.1", port=7878, debug=True)

@@ -1,16 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}我的订单 - 食刻点餐{% endblock %}
+{% block title %}&#25105;&#30340;&#35746;&#21333; - {{ store_name }}{% endblock %}
 
 {% block content %}
 <section class="hero-panel compact-hero">
     <div>
-        <p class="eyebrow">我的订单</p>
-        <h1>这里展示当前浏览器提交过的订单。</h1>
-        <p class="hero-copy">如果更换浏览器或清空 Cookie，这里的匿名订单记录不会自动同步。</p>
+        <h1>&#25105;&#30340;&#35746;&#21333;</h1>
     </div>
     <div class="hero-actions">
-        <a class="button button-secondary" href="{{ url_for('index') }}">返回菜单</a>
+        <a class="button button-secondary" href="{{ url_for('index') }}">&#36820;&#22238;&#33756;&#21333;</a>
     </div>
 </section>
 
@@ -20,37 +18,36 @@
             <article class="card-panel order-card">
                 <div class="section-header">
                     <div>
-                        <p class="section-tag">订单号 #{{ card['order']['id'] }}</p>
-                        <h2>{{ card['order']['created_at'] }}</h2>
+                        <h2>#{{ card['order']['id'] }}</h2>
+                        <p>{{ card['order']['created_at'] }}</p>
                     </div>
                     <span class="status-pill">{{ card['order']['status'] }}</span>
                 </div>
                 {% if card['order']['customer_name'] %}
-                    <p class="helper-text">取餐人：{{ card['order']['customer_name'] }}</p>
+                    <p class="helper-text">&#21462;&#39184;&#20154;&#65306;{{ card['order']['customer_name'] }}</p>
                 {% endif %}
                 <div class="compact-list">
                     {% for item in card['items'] %}
                         <div class="order-line">
                             <div>
                                 <strong>{{ item['dish_name'] }}</strong>
-                                <p>{{ item['quantity'] }} 份 × ¥{{ item['price']|currency }}</p>
+                                <p>{{ item['quantity'] }} &#20221; &times; &yen;{{ item['price']|currency }}</p>
                             </div>
-                            <span>¥{{ item['subtotal']|currency }}</span>
+                            <span>&yen;{{ item['subtotal']|currency }}</span>
                         </div>
                     {% endfor %}
                 </div>
                 <div class="cart-total">
-                    <span>订单总额</span>
-                    <strong>¥{{ card['order']['total_amount']|currency }}</strong>
+                    <span>&#35746;&#21333;&#24635;&#39069;</span>
+                    <strong>&yen;{{ card['order']['total_amount']|currency }}</strong>
                 </div>
             </article>
         {% endfor %}
     </div>
 {% else %}
     <section class="card-panel empty-state tall-empty">
-        <h2>还没有订单记录</h2>
-        <p>从菜单页下单后，当前浏览器的订单会自动出现在这里。</p>
-        <a class="button button-primary" href="{{ url_for('index') }}">去浏览菜单</a>
+        <h2>&#26242;&#26080;&#35746;&#21333;</h2>
+        <a class="button button-primary" href="{{ url_for('index') }}">&#21435;&#27983;&#35272;&#33756;&#21333;</a>
     </section>
 {% endif %}
 {% endblock %}

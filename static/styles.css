@@ -78,6 +78,14 @@ textarea {
     gap: 14px;
 }
 
+.brand-logo {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(214, 108, 46, 0.22);
+    flex: 0 0 auto;
+}
+
 .brand strong {
     display: block;
     font-size: 1.05rem;
@@ -85,18 +93,6 @@ textarea {
 
 .brand small {
     color: var(--muted);
-}
-
-.brand-badge {
-    display: grid;
-    place-items: center;
-    width: 46px;
-    height: 46px;
-    border-radius: 16px;
-    color: #fff;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--accent) 0%, #ff9d4b 100%);
-    box-shadow: 0 12px 30px rgba(214, 108, 46, 0.3);
 }
 
 .top-nav {
@@ -217,7 +213,8 @@ textarea {
 .cart-panel,
 .order-card,
 .stat-card,
-.store-card {
+.store-card,
+.order-admin-panel {
     padding: 22px;
 }
 
@@ -618,6 +615,33 @@ textarea {
     grid-template-columns: 1fr;
 }
 
+.admin-order-list {
+    display: grid;
+    gap: 18px;
+}
+
+.admin-order-card {
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: #fff;
+}
+
+.admin-order-header {
+    align-items: center;
+}
+
+.admin-order-header h3 {
+    margin: 0;
+    font-size: 1.35rem;
+}
+
+.admin-order-side {
+    display: grid;
+    justify-items: end;
+    gap: 10px;
+}
+
 code {
     padding: 2px 6px;
     border-radius: 8px;
@@ -658,7 +682,8 @@ code {
     .auth-card,
     .editor-card,
     .stat-card,
-    .store-card {
+    .store-card,
+    .order-admin-panel {
         padding: 18px;
     }
 
@@ -672,6 +697,10 @@ code {
 
     .cart-actions {
         align-items: flex-start;
+    }
+
+    .admin-order-side {
+        justify-items: start;
     }
 
     .button,

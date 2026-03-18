@@ -1,28 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}管理员登录 - 食刻点餐{% endblock %}
+{% block title %}&#31649;&#29702;&#21592;&#30331;&#24405; - {{ store_name }}{% endblock %}
 
 {% block content %}
 <section class="form-shell">
     <article class="card-panel auth-card">
-        <p class="eyebrow">管理员登录</p>
-        <h1>登录后可维护菜品分类、菜品信息和图片。</h1>
+        <h1>&#31649;&#29702;&#21592;&#30331;&#24405;</h1>
         <form class="stack-form" method="post">
             <label>
-                管理员账号
-                <input type="text" name="username" placeholder="请输入管理员账号" required>
+                &#31649;&#29702;&#21592;&#36134;&#21495;
+                <input type="text" name="username" required>
             </label>
             <label>
-                管理员密码
-                <input type="password" name="password" placeholder="请输入管理员密码" required>
+                &#31649;&#29702;&#21592;&#23494;&#30721;
+                <input type="password" name="password" required>
             </label>
-            <button class="button button-primary button-block" type="submit">进入后台</button>
+            <button class="button button-primary button-block" type="submit">&#36827;&#20837;&#21518;&#21488;</button>
         </form>
-        <div class="tip-box">
-            <strong>初始管理员账号</strong>
-            <p>用户名：<code>admin</code></p>
-            <p>密码：<code>admin123</code></p>
-        </div>
     </article>
 </section>
 {% endblock %}

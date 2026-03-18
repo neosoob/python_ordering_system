@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}购物车 - 食刻点餐{% endblock %}
+{% block title %}&#36141;&#29289;&#36710; - {{ store_name }}{% endblock %}
 
 {% block content %}
 <section class="hero-panel compact-hero">
     <div>
-        <p class="eyebrow">购物车</p>
-        <h1>确认数量后即可提交订单。</h1>
+        <h1>&#36141;&#29289;&#36710;</h1>
     </div>
     <div class="hero-actions">
-        <a class="button button-secondary" href="{{ url_for('index') }}">继续点餐</a>
+        <a class="button button-secondary" href="{{ url_for('index') }}">&#32487;&#32493;&#28857;&#39184;</a>
     </div>
 </section>
 
@@ -26,21 +25,21 @@
                     <div class="cart-info">
                         <h3>{{ item.dish['name'] }}</h3>
                         <p>{{ item.dish['description'] }}</p>
-                        <span class="price-text">单价 ¥{{ item.dish['price']|currency }}</span>
+                        <span class="price-text">&#21333;&#20215; &yen;{{ item.dish['price']|currency }}</span>
                     </div>
                     <form class="inline-form compact-form" action="{{ url_for('update_cart', dish_id=item.dish['id']) }}" method="post">
                         <input type="hidden" name="next" value="{{ request.path }}">
                         <label>
-                            数量
+                            &#25968;&#37327;
                             <input type="number" name="quantity" min="0" max="99" value="{{ item.quantity }}">
                         </label>
-                        <button class="button button-secondary" type="submit">更新</button>
+                        <button class="button button-secondary" type="submit">&#26356;&#26032;</button>
                     </form>
                     <div class="cart-actions">
-                        <strong>¥{{ item.subtotal|currency }}</strong>
+                        <strong>&yen;{{ item.subtotal|currency }}</strong>
                         <form action="{{ url_for('remove_from_cart', dish_id=item.dish['id']) }}" method="post">
                             <input type="hidden" name="next" value="{{ request.path }}">
-                            <button class="button button-ghost" type="submit">移除</button>
+                            <button class="button button-ghost" type="submit">&#31227;&#38500;</button>
                         </form>
                     </div>
                 </article>
@@ -49,20 +48,19 @@
 
         <form class="checkout-bar checkout-form" action="{{ url_for('checkout') }}" method="post">
             <div class="checkout-summary">
-                <p>共 {{ cart_items|length }} 种菜品</p>
-                <strong>¥{{ cart_total|currency }}</strong>
+                <p>&#20849; {{ cart_items|length }} &#31181;&#33756;&#21697;</p>
+                <strong>&yen;{{ cart_total|currency }}</strong>
             </div>
             <label class="checkout-name">
-                取餐人（可选）
-                <input type="text" name="customer_name" placeholder="例如：张三">
+                &#21462;&#39184;&#20154;
+                <input type="text" name="customer_name" placeholder="&#20363;&#22914;&#65306;&#24352;&#19977;">
             </label>
-            <button class="button button-primary" type="submit">提交订单</button>
+            <button class="button button-primary" type="submit">&#25552;&#20132;&#35746;&#21333;</button>
         </form>
     {% else %}
         <div class="empty-state tall-empty">
-            <h2>购物车还是空的</h2>
-            <p>去菜单页挑选菜品后，再回来统一确认下单。</p>
-            <a class="button button-primary" href="{{ url_for('index') }}">去点餐</a>
+            <h2>&#36141;&#29289;&#36710;&#20026;&#31354;</h2>
+            <a class="button button-primary" href="{{ url_for('index') }}">&#21435;&#28857;&#39184;</a>
         </div>
     {% endif %}
 </section>
