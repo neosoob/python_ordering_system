@@ -3,7 +3,7 @@ import sqlite3
 import uuid
 from functools import wraps
 
-from flask import Flask, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, current_app, flash, g, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -222,6 +222,8 @@ def create_app(test_config=None):
             (dish_id,),
         ).fetchone()
         if dish is None:
+            if wants_json_response():
+                return jsonify({"ok": False, "message": "菜品不存在或已下架。"}), 404
             flash("菜品不存在或已下架。", "warning")
             return redirect(url_for("index"))
 
@@ -230,6 +232,14 @@ def create_app(test_config=None):
         dish_key = str(dish_id)
         cart[dish_key] = min(cart.get(dish_key, 0) + quantity, 99)
         session["cart"] = cart
+        if wants_json_response():
+            return jsonify(
+                {
+                    "ok": True,
+                    "message": "已加入购物车。",
+                    "cart": build_cart_payload(),
+                }
+            )
         flash("已加入购物车。", "success")
         return redirect(get_safe_next("index"))
 
@@ -238,13 +248,16 @@ def create_app(test_config=None):
         quantity = parse_quantity(request.form.get("quantity", "1"))
         cart = session.get("cart", {})
         dish_key = str(dish_id)
+        message = "购物车已更新。"
         if quantity <= 0:
             cart.pop(dish_key, None)
-            flash("已从购物车移除菜品。", "success")
+            message = "已从购物车移除菜品。"
         else:
             cart[dish_key] = min(quantity, 99)
-            flash("购物车已更新。", "success")
         session["cart"] = cart
+        if wants_json_response():
+            return jsonify({"ok": True, "message": message, "cart": build_cart_payload()})
+        flash(message, "success")
         return redirect(get_safe_next("cart"))
 
     @app.route("/cart/remove/<int:dish_id>", methods=("POST",))
@@ -252,6 +265,14 @@ def create_app(test_config=None):
         cart = session.get("cart", {})
         cart.pop(str(dish_id), None)
         session["cart"] = cart
+        if wants_json_response():
+            return jsonify(
+                {
+                    "ok": True,
+                    "message": "已从购物车移除菜品。",
+                    "cart": build_cart_payload(),
+                }
+            )
         flash("已从购物车移除菜品。", "success")
         return redirect(get_safe_next("cart"))
 
@@ -843,6 +864,31 @@ def refresh_order_total(db, order_id):
         "UPDATE orders SET total_amount = ? WHERE id = ?",
         (round(float(total), 2), order_id),
     )
+
+
+def build_cart_payload():
+    cart_items, cart_total = get_cart_items()
+    return {
+        "count": sum(item["quantity"] for item in cart_items),
+        "distinct_count": len(cart_items),
+        "total": round(float(cart_total), 2),
+        "items": [
+            {
+                "dish_id": item["dish"]["id"],
+                "name": item["dish"]["name"],
+                "description": item["dish"]["description"],
+                "image_path": item["dish"]["image_path"] or DEFAULT_IMAGE_PATH,
+                "price": round(float(item["dish"]["price"]), 2),
+                "quantity": item["quantity"],
+                "subtotal": round(float(item["subtotal"]), 2),
+            }
+            for item in cart_items
+        ],
+    }
+
+
+def wants_json_response():
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 
 def build_grouped_menu(categories, dishes):

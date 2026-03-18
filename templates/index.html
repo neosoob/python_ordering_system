@@ -47,7 +47,7 @@
                                     <strong>&yen;{{ dish['price']|currency }}</strong>
                                 </div>
                                 <p>{{ dish['description'] }}</p>
-                                <form class="inline-form" action="{{ url_for('add_to_cart', dish_id=dish['id']) }}" method="post">
+                                <form class="inline-form" action="{{ url_for('add_to_cart', dish_id=dish['id']) }}" method="post" data-cart-add-form>
                                     <input type="hidden" name="next" value="{{ request.path }}">
                                     <label>
                                         &#25968;&#37327;
@@ -64,7 +64,7 @@
     </div>
 
     <aside class="cart-column">
-        <section class="card-panel cart-panel">
+        <section class="card-panel cart-panel" data-cart-summary>
             <div class="section-header">
                 <div>
                     <h2>&#36141;&#29289;&#36710;</h2>
@@ -73,22 +73,28 @@
             </div>
 
             {% if cart_items %}
-                <div class="cart-list compact-list">
+                <div class="cart-list compact-list" data-cart-summary-list>
                     {% for item in cart_items %}
-                        <div class="cart-item">
+                        <div class="cart-item" data-cart-summary-item="{{ item.dish['id'] }}">
                             <div>
                                 <strong>{{ item.dish['name'] }}</strong>
                                 <p>{{ item.quantity }} &#20221;</p>
                             </div>
-                            <span>&yen;{{ item.subtotal|currency }}</span>
+                            <div class="cart-summary-actions">
+                                <span>&yen;{{ item.subtotal|currency }}</span>
+                                <form action="{{ url_for('remove_from_cart', dish_id=item.dish['id']) }}" method="post" data-cart-remove-form>
+                                    <input type="hidden" name="next" value="{{ request.path }}">
+                                    <button class="button button-ghost button-small" type="submit">&#31227;&#38500;</button>
+                                </form>
+                            </div>
                         </div>
                     {% endfor %}
                 </div>
-                <div class="cart-total">
+                <div class="cart-total" data-cart-summary-total>
                     <span>&#21512;&#35745;</span>
                     <strong>&yen;{{ cart_total|currency }}</strong>
                 </div>
-                <form class="stack-form" action="{{ url_for('checkout') }}" method="post">
+                <form class="stack-form" action="{{ url_for('checkout') }}" method="post" data-cart-checkout-form>
                     <label>
                         &#21462;&#39184;&#20154;
                         <input type="text" name="customer_name" placeholder="&#20363;&#22914;&#65306;&#24352;&#19977;">
@@ -96,7 +102,7 @@
                     <button class="button button-primary button-block" type="submit">&#25552;&#20132;&#35746;&#21333;</button>
                 </form>
             {% else %}
-                <div class="empty-state">
+                <div class="empty-state" data-cart-summary-empty>
                     <p>&#26242;&#26080;&#33756;&#21697;</p>
                 </div>
             {% endif %}

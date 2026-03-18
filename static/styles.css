@@ -367,6 +367,12 @@ textarea {
     transform: translateY(-1px);
 }
 
+.button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+    transform: none;
+}
+
 .button-primary {
     color: #fff;
     background: linear-gradient(135deg, var(--accent) 0%, #ff9450 100%);
@@ -434,6 +440,12 @@ textarea {
 .order-line p {
     margin: 6px 0 0;
     color: var(--muted);
+}
+
+.cart-summary-actions {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
 }
 
 .cart-item-detailed {
@@ -697,6 +709,10 @@ code {
 
     .cart-actions {
         align-items: flex-start;
+    }
+
+    .cart-summary-actions {
+        justify-items: start;
     }
 
     .admin-order-side {

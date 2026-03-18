@@ -1,4 +1,5 @@
 import os
+import json
 from io import BytesIO
 import unittest
 
@@ -60,6 +61,22 @@ class OrderingSystemTestCase(unittest.TestCase):
         with self.app.app_context():
             order_count = get_db().execute("SELECT COUNT(*) FROM orders").fetchone()[0]
         self.assertEqual(order_count, 1)
+
+    def test_add_to_cart_returns_json_for_async_requests(self):
+        with self.app.app_context():
+            dish = get_db().execute(
+                "SELECT id FROM dishes ORDER BY id LIMIT 1"
+            ).fetchone()
+
+        response = self.client.post(
+            f"/cart/add/{dish['id']}",
+            data={"quantity": "2", "next": "/"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.data)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["cart"]["count"], 2)
 
     def test_admin_can_update_store_name(self):
         self.login_admin()

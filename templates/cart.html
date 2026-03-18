@@ -12,11 +12,11 @@
     </div>
 </section>
 
-<section class="card-panel">
+<section class="card-panel" data-cart-page>
     {% if cart_items %}
-        <div class="cart-list">
+        <div class="cart-list" data-cart-page-list>
             {% for item in cart_items %}
-                <article class="cart-item cart-item-detailed">
+                <article class="cart-item cart-item-detailed" data-cart-page-item="{{ item.dish['id'] }}">
                     <img
                         class="cart-thumb"
                         src="{{ url_for('static', filename=item.dish['image_path'] or 'demo/default-dish.svg') }}"
@@ -27,7 +27,7 @@
                         <p>{{ item.dish['description'] }}</p>
                         <span class="price-text">&#21333;&#20215; &yen;{{ item.dish['price']|currency }}</span>
                     </div>
-                    <form class="inline-form compact-form" action="{{ url_for('update_cart', dish_id=item.dish['id']) }}" method="post">
+                    <form class="inline-form compact-form" action="{{ url_for('update_cart', dish_id=item.dish['id']) }}" method="post" data-cart-update-form>
                         <input type="hidden" name="next" value="{{ request.path }}">
                         <label>
                             &#25968;&#37327;
@@ -36,8 +36,8 @@
                         <button class="button button-secondary" type="submit">&#26356;&#26032;</button>
                     </form>
                     <div class="cart-actions">
-                        <strong>&yen;{{ item.subtotal|currency }}</strong>
-                        <form action="{{ url_for('remove_from_cart', dish_id=item.dish['id']) }}" method="post">
+                        <strong data-cart-page-subtotal>&yen;{{ item.subtotal|currency }}</strong>
+                        <form action="{{ url_for('remove_from_cart', dish_id=item.dish['id']) }}" method="post" data-cart-remove-form>
                             <input type="hidden" name="next" value="{{ request.path }}">
                             <button class="button button-ghost" type="submit">&#31227;&#38500;</button>
                         </form>
@@ -46,8 +46,8 @@
             {% endfor %}
         </div>
 
-        <form class="checkout-bar checkout-form" action="{{ url_for('checkout') }}" method="post">
-            <div class="checkout-summary">
+        <form class="checkout-bar checkout-form" action="{{ url_for('checkout') }}" method="post" data-cart-checkout-form>
+            <div class="checkout-summary" data-cart-page-summary>
                 <p>&#20849; {{ cart_items|length }} &#31181;&#33756;&#21697;</p>
                 <strong>&yen;{{ cart_total|currency }}</strong>
             </div>
@@ -58,7 +58,7 @@
             <button class="button button-primary" type="submit">&#25552;&#20132;&#35746;&#21333;</button>
         </form>
     {% else %}
-        <div class="empty-state tall-empty">
+        <div class="empty-state tall-empty" data-cart-page-empty>
             <h2>&#36141;&#29289;&#36710;&#20026;&#31354;</h2>
             <a class="button button-primary" href="{{ url_for('index') }}">&#21435;&#28857;&#39184;</a>
         </div>
