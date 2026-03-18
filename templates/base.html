@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}点餐系统{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-badge">OS</span>
+                <span>
+                    <strong>{{ store_name }}</strong>
+                    <small>匿名用户端 + 管理后台</small>
+                </span>
+            </a>
+            <nav class="top-nav">
+                <a href="{{ url_for('index') }}">菜单</a>
+                <a href="{{ url_for('cart') }}">购物车{% if cart_count %} ({{ cart_count }}){% endif %}</a>
+                <a href="{{ url_for('orders') }}">我的订单</a>
+                {% if g.admin %}
+                    <a href="{{ url_for('admin_dashboard') }}">管理后台</a>
+                    <a href="{{ url_for('admin_logout') }}">退出后台</a>
+                {% else %}
+                    <a href="{{ url_for('admin_login') }}">管理员登录</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="container main-shell">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <section class="flash-stack">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

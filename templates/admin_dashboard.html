@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}管理后台 - 食刻点餐{% endblock %}
+
+{% block content %}
+<section class="hero-panel">
+    <div>
+        <p class="eyebrow">管理员后台</p>
+        <h1>集中维护菜单分类、菜品信息和图片资源。</h1>
+        <p class="hero-copy">后台支持分类和菜品的增删改，上传的图片将保存在本地 `static/uploads` 目录中。</p>
+    </div>
+    <div class="hero-actions">
+        <a class="button button-primary" href="{{ url_for('admin_dish_create') }}">新增菜品</a>
+        <a class="button button-secondary" href="{{ url_for('admin_category_create') }}">新增分类</a>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="card-panel stat-card">
+        <p>分类数量</p>
+        <strong>{{ category_count }}</strong>
+    </article>
+    <article class="card-panel stat-card">
+        <p>菜品数量</p>
+        <strong>{{ dish_count }}</strong>
+    </article>
+    <article class="card-panel stat-card">
+        <p>订单总数</p>
+        <strong>{{ order_count }}</strong>
+    </article>
+</section>
+
+<section class="card-panel store-card">
+    <div class="section-header">
+        <div>
+            <p class="section-tag">店铺设置</p>
+            <h2>店名维护</h2>
+        </div>
+    </div>
+    <form class="inline-form" action="{{ url_for('admin_store_update') }}" method="post">
+        <label class="store-name-field">
+            店名
+            <input type="text" name="store_name" value="{{ store_name }}" required>
+        </label>
+        <button class="button button-primary" type="submit">更新店名</button>
+    </form>
+</section>
+
+<section class="admin-grid">
+    <article class="card-panel">
+        <div class="section-header">
+            <div>
+                <p class="section-tag">菜单分类</p>
+                <h2>分类管理</h2>
+            </div>
+            <a class="text-link" href="{{ url_for('admin_category_create') }}">新增分类</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>排序</th>
+                        <th>分类名称</th>
+                        <th>菜品数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category in categories %}
+                        <tr>
+                            <td>{{ category['sort_order'] }}</td>
+                            <td>{{ category['name'] }}</td>
+                            <td>{{ category['dish_count'] }}</td>
+                            <td class="action-cell">
+                                <a class="button button-secondary button-small" href="{{ url_for('admin_category_edit', category_id=category['id']) }}">编辑</a>
+                                <form action="{{ url_for('admin_category_delete', category_id=category['id']) }}" method="post">
+                                    <button class="button button-ghost button-small" type="submit">删除</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="card-panel">
+        <div class="section-header">
+            <div>
+                <p class="section-tag">菜单菜品</p>
+                <h2>菜品管理</h2>
+            </div>
+            <a class="text-link" href="{{ url_for('admin_dish_create') }}">新增菜品</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>图片</th>
+                        <th>名称</th>
+                        <th>分类</th>
+                        <th>价格</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dish in dishes %}
+                        <tr>
+                            <td>
+                                <img
+                                    class="table-thumb"
+                                    src="{{ url_for('static', filename=dish['image_path'] or 'demo/default-dish.svg') }}"
+                                    alt="{{ dish['name'] }}"
+                                >
+                            </td>
+                            <td>
+                                <strong>{{ dish['name'] }}</strong>
+                                <p class="table-description">{{ dish['description'] }}</p>
+                            </td>
+                            <td>{{ dish['category_name'] }}</td>
+                            <td>¥{{ dish['price']|currency }}</td>
+                            <td>
+                                <span class="status-pill {{ 'status-offline' if not dish['is_active'] }}">
+                                    {{ '上架中' if dish['is_active'] else '已下架' }}
+                                </span>
+                            </td>
+                            <td class="action-cell">
+                                <a class="button button-secondary button-small" href="{{ url_for('admin_dish_edit', dish_id=dish['id']) }}">编辑</a>
+                                <form action="{{ url_for('admin_dish_delete', dish_id=dish['id']) }}" method="post">
+                                    <button class="button button-ghost button-small" type="submit">删除</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="card-panel">
+        <div class="section-header">
+            <div>
+                <p class="section-tag">最近订单</p>
+                <h2>订单概览</h2>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>订单号</th>
+                        <th>取餐人</th>
+                        <th>金额</th>
+                        <th>状态</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                        <tr>
+                            <td>#{{ order['id'] }}</td>
+                            <td>{{ order['customer_name'] or '匿名访客' }}</td>
+                            <td>¥{{ order['total_amount']|currency }}</td>
+                            <td>{{ order['status'] }}</td>
+                            <td>{{ order['created_at'] }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">暂无订单</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

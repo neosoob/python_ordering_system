@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} - 食刻点餐{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <article class="card-panel editor-card wide-card">
+        <p class="eyebrow">菜品维护</p>
+        <h1>{{ form_title }}</h1>
+        <form class="stack-form" method="post" enctype="multipart/form-data">
+            <div class="form-grid">
+                <label>
+                    菜品名称
+                    <input type="text" name="name" value="{{ dish['name'] if dish else '' }}" required>
+                </label>
+                <label>
+                    菜品分类
+                    <select name="category_id" required>
+                        {% for category in categories %}
+                            <option
+                                value="{{ category['id'] }}"
+                                {% if dish and dish['category_id'] == category['id'] %}selected{% endif %}
+                            >
+                                {{ category['name'] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    价格
+                    <input type="number" name="price" min="0.01" step="0.01" value="{{ dish['price'] if dish else '' }}" required>
+                </label>
+                <label>
+                    菜品图片
+                    <input type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp,.svg">
+                </label>
+            </div>
+
+            <label>
+                菜品介绍
+                <textarea name="description" rows="5" required>{{ dish['description'] if dish else '' }}</textarea>
+            </label>
+
+            <label class="checkbox-line">
+                <input type="checkbox" name="is_active" {% if not dish or dish['is_active'] %}checked{% endif %}>
+                上架展示给用户端
+            </label>
+
+            {% if dish %}
+                <div class="preview-box">
+                    <p>当前图片</p>
+                    <img
+                        class="preview-image"
+                        src="{{ url_for('static', filename=dish['image_path'] or 'demo/default-dish.svg') }}"
+                        alt="{{ dish['name'] }}"
+                    >
+                </div>
+            {% endif %}
+
+            <div class="form-actions">
+                <button class="button button-primary" type="submit">{{ submit_label }}</button>
+                <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">返回后台</a>
+            </div>
+        </form>
+    </article>
+</section>
+{% endblock %}

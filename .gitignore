@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+instance/
+static/uploads/*
+!static/uploads/.gitkeep
+venv/
+.venv/
+tests_runtime/

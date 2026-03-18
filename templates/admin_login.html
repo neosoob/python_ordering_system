@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}管理员登录 - 食刻点餐{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <article class="card-panel auth-card">
+        <p class="eyebrow">管理员登录</p>
+        <h1>登录后可维护菜品分类、菜品信息和图片。</h1>
+        <form class="stack-form" method="post">
+            <label>
+                管理员账号
+                <input type="text" name="username" placeholder="请输入管理员账号" required>
+            </label>
+            <label>
+                管理员密码
+                <input type="password" name="password" placeholder="请输入管理员密码" required>
+            </label>
+            <button class="button button-primary button-block" type="submit">进入后台</button>
+        </form>
+        <div class="tip-box">
+            <strong>初始管理员账号</strong>
+            <p>用户名：<code>admin</code></p>
+            <p>密码：<code>admin123</code></p>
+        </div>
+    </article>
+</section>
+{% endblock %}
